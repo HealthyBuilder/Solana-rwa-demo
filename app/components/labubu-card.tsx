@@ -17,17 +17,16 @@ export function LabubuCard() {
 
     try {
       // Simulated random selection logic
-      // Frontend generates random number, on-chain should use on-chain randomness
-      const totalWeight = labubuMetadata.labubus.reduce((sum, l) => sum + l.supply, 0);
+      const totalWeight = 1206; // 120*10 + 6
       const random = Math.floor(Math.random() * totalWeight);
 
       let cumulative = 0;
-      let selected = labubuMetadata.labubus[0];
+      let selected = 1;
 
       for (const labubu of labubuMetadata.labubus) {
         cumulative += labubu.supply;
         if (random < cumulative) {
-          selected = labubu;
+          selected = labubu.id;
           break;
         }
       }
@@ -35,7 +34,7 @@ export function LabubuCard() {
       // TODO: Call on-chain program to mint NFT
       // await mintLabubuNFT(selected.id);
 
-      setSelectedLabubu(selected.id);
+      setSelectedLabubu(selected);
     } catch (error: any) {
       alert("Failed to mint Labubu. " + (error.message || "Please try again."));
     }
