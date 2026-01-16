@@ -1,95 +1,125 @@
 use anchor_lang::prelude::*;
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token_2022::Token2022,
+    token_interface::TokenAccount,
+};
 
 #[cfg(test)]
 mod tests;
 
 declare_id!("B6HTnuN4RgoEnsxWFm74TVXdHEQb7fSjguzovQQjZseY");
 
-const TOTAL_LABUBU_TYPES: usize = 12;
+const TOTAL_LABUBU_TYPES: usize = 11;
 const NORMAL_SUPPLY: u16 = 120;
-const RARE_SUPPLY: u16 = 1;
+const RARE_SUPPLY: u16 = 6;
 
 #[program]
 pub mod vault {
     use super::*;
+    use anchor_spl::token_interface;
 
-    /// 初始化 Labubu Collection
-    /// 11种普通款每种120个，1种隐藏款1个
+    /// Initialize the Labubu Collection
     pub fn initialize_collection(ctx: Context<InitializeCollection>) -> Result<()> {
         let collection = &mut ctx.accounts.collection;
 
-        // 初始化库存：前11种每种120个，第12种1个
         for i in 0..TOTAL_LABUBU_TYPES {
-            collection.remaining_supply[i] = if i < 11 { NORMAL_SUPPLY } else { RARE_SUPPLY };
+            collection.remaining_supply[i] = if i < 10 { NORMAL_SUPPLY } else { RARE_SUPPLY };
         }
 
         collection.total_minted = 0;
         collection.authority = ctx.accounts.authority.key();
 
+        msg!("Labubu Collection initialized!");
         Ok(())
     }
 
-    /// 抽取一个随机的 Labubu
-    pub fn mint_random(ctx: Context<MintRandom>) -> Result<()> {
-        let collection = &mut ctx.accounts.collection;
-        let user_labubu = &mut ctx.accounts.user_labubu;
+    /// Create a Token-2022 Mint for a specific Labubu ID
+    pub fn create_labubu_mint(ctx: Context<CreateLabubuMint>, labubu_id: u8) -> Result<()> {
+        require!(labubu_id >= 1 && labubu_id <= 11, LabubuError::InvalidLabubuId);
 
-        // 检查用户是否已经抽过
-        require!(
-            user_labubu.labubu_id == 0,
-            LabubuError::AlreadyMinted
+        let rent = Rent::get()?;
+        let mint_size = 82;
+        let lamports = rent.minimum_balance(mint_size);
+
+        // Step 1: Create mint account
+        anchor_lang::system_program::create_account(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                anchor_lang::system_program::CreateAccount {
+                    from: ctx.accounts.authority.to_account_info(),
+                    to: ctx.accounts.mint.to_account_info(),
+                },
+                &[&[b"labubu_mint", &[labubu_id], &[ctx.bumps.mint]]],
+            ),
+            lamports,
+            mint_size as u64,
+            &ctx.accounts.token_program.key(),
+        )?;
+
+        // Step 2: Initialize Token-2022 Mint
+        let cpi_context = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            token_interface::InitializeMint2 {
+                mint: ctx.accounts.mint.to_account_info(),
+            },
         );
 
-        // 计算剩余总数
-        let total_remaining: u16 = collection.remaining_supply.iter().sum();
-        require!(total_remaining > 0, LabubuError::SoldOut);
+        token_interface::initialize_mint2(
+            cpi_context,
+            0,  // decimals = 0 (NFT)
+            &ctx.accounts.collection.key(),  // mint_authority = collection PDA
+            None,  // freeze_authority = None
+        )?;
 
-        // 使用 Clock 生成伪随机数
-        let clock = Clock::get()?;
-        let random_seed = clock.unix_timestamp as u64 ^ clock.slot;
-        let random_index = (random_seed % total_remaining as u64) as u16;
+        msg!("Created Labubu #{} mint: {}", labubu_id, ctx.accounts.mint.key());
+        Ok(())
+    }
 
-        // 找到对应的 Labubu ID
-        let mut cumulative = 0u16;
-        let mut selected_id = 0u8;
+    /// Mint a Labubu NFT to a user
+    pub fn mint_random(ctx: Context<MintRandom>, labubu_id: u8) -> Result<()> {
+        let collection = &mut ctx.accounts.collection;
 
-        for (i, &supply) in collection.remaining_supply.iter().enumerate() {
-            cumulative += supply;
-            if random_index < cumulative {
-                selected_id = (i + 1) as u8; // ID 从 1 开始
-                collection.remaining_supply[i] -= 1;
-                break;
-            }
-        }
+        require!(labubu_id >= 1 && labubu_id <= 11, LabubuError::InvalidLabubuId);
+        let index = (labubu_id - 1) as usize;
 
-        // 记录用户抽中的 Labubu
-        user_labubu.owner = ctx.accounts.user.key();
-        user_labubu.labubu_id = selected_id;
-        user_labubu.minted_at = clock.unix_timestamp;
+        require!(collection.remaining_supply[index] > 0, LabubuError::SoldOut);
+        collection.remaining_supply[index] -= 1;
 
+        // PDA signing: collection PDA acts as mint authority
+        let seeds = &[b"collection".as_ref(), &[ctx.bumps.collection]];
+        let signer_seeds = &[&seeds[..]];
+
+        let cpi_context = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            token_interface::MintTo {
+                mint: ctx.accounts.mint.to_account_info(),
+                to: ctx.accounts.user_token_account.to_account_info(),
+                authority: collection.to_account_info(),
+            },
+            signer_seeds,
+        );
+
+        token_interface::mint_to(cpi_context, 1)?;
         collection.total_minted += 1;
 
-        msg!("Minted Labubu #{} for user {}", selected_id, ctx.accounts.user.key());
+        msg!(
+            "User {} minted Labubu #{} ({})",
+            ctx.accounts.user.key(),
+            labubu_id,
+            ctx.accounts.mint.key()
+        );
 
         Ok(())
     }
 }
 
-/// Collection 账户，存储所有 Labubu 的库存信息
 #[account]
 pub struct LabubuCollection {
-    pub authority: Pubkey,                      // 8 + 32
-    pub remaining_supply: [u16; TOTAL_LABUBU_TYPES], // 12 * 2 = 24
-    pub total_minted: u32,                      // 4
-} // Total: 68 bytes
-
-/// 用户的 Labubu NFT 记录
-#[account]
-pub struct UserLabubu {
-    pub owner: Pubkey,      // 32
-    pub labubu_id: u8,      // 1 (1-12)
-    pub minted_at: i64,     // 8
-} // Total: 41 bytes
+    pub authority: Pubkey,
+    pub remaining_supply: [u16; TOTAL_LABUBU_TYPES],
+    pub total_minted: u32,
+}
 
 #[derive(Accounts)]
 pub struct InitializeCollection<'info> {
@@ -99,7 +129,7 @@ pub struct InitializeCollection<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + 68,
+        space = 8 + 32 + 22 + 4,
         seeds = [b"collection"],
         bump
     )]
@@ -109,6 +139,33 @@ pub struct InitializeCollection<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(labubu_id: u8)]
+pub struct CreateLabubuMint<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [b"collection"],
+        bump,
+        has_one = authority
+    )]
+    pub collection: Account<'info, LabubuCollection>,
+
+    /// CHECK: Safe because we create and initialize it
+    #[account(
+        mut,
+        seeds = [b"labubu_mint", &[labubu_id]],
+        bump
+    )]
+    pub mint: UncheckedAccount<'info>,
+
+    pub token_program: Program<'info, Token2022>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+#[instruction(labubu_id: u8)]
 pub struct MintRandom<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
@@ -116,26 +173,36 @@ pub struct MintRandom<'info> {
     #[account(
         mut,
         seeds = [b"collection"],
-        bump
+        bump,
     )]
     pub collection: Account<'info, LabubuCollection>,
 
+    /// CHECK: Verified by seeds
     #[account(
-        init,
-        payer = user,
-        space = 8 + 41,
-        seeds = [b"user_labubu", user.key().as_ref()],
-        bump
+        mut,
+        seeds = [b"labubu_mint", &[labubu_id]],
+        bump,
     )]
-    pub user_labubu: Account<'info, UserLabubu>,
+    pub mint: UncheckedAccount<'info>,
 
+    #[account(
+        init_if_needed,
+        payer = user,
+        associated_token::mint = mint,
+        associated_token::authority = user,
+        associated_token::token_program = token_program
+    )]
+    pub user_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token2022>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
 #[error_code]
 pub enum LabubuError {
-    #[msg("Already minted a Labubu")]
-    AlreadyMinted,
     #[msg("All Labubu sold out")]
     SoldOut,
+    #[msg("Invalid Labubu ID (must be 1-11)")]
+    InvalidLabubuId,
 }

@@ -1,6 +1,6 @@
 "use client";
 import { useWalletConnection } from "@solana/react-hooks";
-import { VaultCard } from "./components/vault-card";
+import { LabubuCard } from "./components/labubu-card";
 
 export default function Home() {
   const { connectors, connect, disconnect, wallet, status } =
@@ -13,16 +13,13 @@ export default function Home() {
       <main className="relative z-10 mx-auto flex min-h-screen max-w-4xl flex-col gap-10 border-x border-border-low px-6 py-16">
         <header className="space-y-3">
           <p className="text-sm uppercase tracking-[0.18em] text-muted">
-            Solana starter kit
+            Labubu RWA Demo
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-            Ship a Solana dapp fast
+            Labubu Lazy Yoga Collection
           </h1>
           <p className="max-w-3xl text-base leading-relaxed text-muted">
-            Drop in <code className="font-mono">@solana/react-hooks</code>, wrap
-            your tree once, and you get wallet connect/disconnect plus
-            ready-to-use hooks for balances and transactions—no manual RPC
-            wiring.
+            A Solana RWA demo using Token-2022 standard. Open mystery boxes to collect limited edition Labubu NFTs!
           </p>
           <ul className="mt-4 space-y-2 text-sm text-foreground">
             <li className="flex gap-2">
@@ -152,8 +149,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Vault Program Section */}
-        <VaultCard />
+        {/* Labubu Mystery Box */}
+        <LabubuCard />
       </main>
     </div>
   );
