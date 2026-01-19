@@ -44,6 +44,7 @@ next-env.d.ts
 # anchor build artifacts
 /anchor/.anchor/
 /anchor/target/
+/anchor/node_modules/
 
 # Solana keypairs and wallets (IMPORTANT: never commit private keys!)
 *.json
@@ -52,6 +53,8 @@ next-env.d.ts
 !tsconfig.json
 !codama.json
 !anchor/Anchor.toml
+!labubu-metadata.json
+!/anchor/tsconfig.json
 
 # IDEs
 .vscode/
