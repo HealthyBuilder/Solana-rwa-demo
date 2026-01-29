@@ -6,7 +6,8 @@
     "test": "mocha -t 1000000 tests/"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.1"
+    "@coral-xyz/anchor": "^0.31.1",
+    "yarn": "^1.22.22"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",

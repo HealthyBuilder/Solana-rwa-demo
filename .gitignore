@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -9,6 +9,9 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
 
 # testing
 /coverage
@@ -44,17 +47,15 @@ next-env.d.ts
 # anchor build artifacts
 /anchor/.anchor/
 /anchor/target/
-/anchor/node_modules/
+Cargo.lock
 
 # Solana keypairs and wallets (IMPORTANT: never commit private keys!)
-*.json
-!package.json
-!package-lock.json
-!tsconfig.json
-!codama.json
-!anchor/Anchor.toml
-!labubu-metadata.json
-!/anchor/tsconfig.json
+*-keypair.json
+*.key
+.config/solana/
+
+# Auto-generated TypeScript client from Codama
+/app/generated/
 
 # IDEs
 .vscode/

@@ -1,12 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { useWalletConnection } from "@solana/react-hooks";
+import { useSendTransaction, useWalletConnection } from "@solana/react-hooks";
 import labubuMetadata from "../../labubu-metadata.json";
+import { getMintRandomInstructionAsync } from "../generated/vault/instructions/mintRandom";
+import { get } from "http";
 
 export function LabubuCard() {
   const { wallet, status } = useWalletConnection();
   const [selectedLabubu, setSelectedLabubu] = useState<number | null>(null);
+
+  const { send, isSending } = useSendTransaction();
+  const [txSignature, setTxSignature] = useState<string | null>(null);
+
+  const MINT_ADRRESSES = [
+    "xU75nFnFbmktGubuXdoy14Eg8YT5D1XkMUC7K97ABMQ",
+    "7oD87fuM4wkiP2nrRCpEwG8GHczSuC64Lqzsoq27eHV3",
+    "FxuRVdYTfACd9d68zjSQUxN5qqB8FcgEZmf4aNu2umdg",
+
+    "422ewKXmBgoDv9BzEU82TPoWryxvMav9gpVPv9DpeZN8",
+    "G2qTj7kNEMgPSMbJ8GS19cLNU8ogKxQojFUE7ihVFrfU",
+    "6rGKN6oexWERQJrJFyfU5uTVxN9pswRKAcyry9o9RCYj",
+
+    "BwqNNaibmqEpGz6b8RseQcuXSEgQi2cgsjEhPwmqBjLv",
+    "C8AN1xqCTTvSaPjBvRMRQ8jkSczzZTXpTtv5Qx251Zbo",
+    "4Y4m9ky35ReZCZhJ1Frq5LWbykEjghYacCUPdCb3eG9p",
+    "7Tu4A7BtiGMQ9N1JxGucygxRf47GP3q3Bm7SUKZb3xfF",
+    "HLDQAYqyPBK7RKCUoePjd2mSapk5BGPgHGU5b7zeRKWP",
+  ];
+
 
   // Mock random Labubu NFT minting
   const handleMint = async () => {
@@ -33,8 +55,28 @@ export function LabubuCard() {
 
       // TODO: Call on-chain program to mint NFT
       // await mintLabubuNFT(selected.id);
+      const mintAddress = MINT_ADRRESSES[selected - 1];
 
+      const userSigner = {
+        address: wallet.account.address,
+        signTransaction: wallet.signTransaction,
+        signMessage: wallet.signMessage,
+      };
+
+      const instruction = await getMintRandomInstructionAsync({
+        user: userSigner as any,
+        mint: mintAddress as any,
+        labubuId: selected,
+      });
+
+      const signature = await send({
+        instructions: [instruction],
+      });
+      
+      setTxSignature(signature);
       setSelectedLabubu(selected);
+
+      alert(`Successfully minted Labubu #${selected}! Transaction: ${signature}`);
     } catch (error: any) {
       alert("Failed to mint Labubu. " + (error.message || "Please try again."));
     }

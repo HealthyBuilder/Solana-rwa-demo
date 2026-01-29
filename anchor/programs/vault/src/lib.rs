@@ -8,7 +8,7 @@ use anchor_spl::{
 #[cfg(test)]
 mod tests;
 
-declare_id!("B6HTnuN4RgoEnsxWFm74TVXdHEQb7fSjguzovQQjZseY");
+declare_id!("6RSKyunojsMYHZQWzeP6SPGXnmZwjHAcPcbEumk7Cw2g");
 
 const TOTAL_LABUBU_TYPES: usize = 11;
 const NORMAL_SUPPLY: u16 = 120;
@@ -34,7 +34,7 @@ pub mod vault {
         Ok(())
     }
 
-    /// Create a Token-2022 Mint for a specific Labubu ID
+    /// Create a Token Mint for a specific Labubu ID
     pub fn create_labubu_mint(ctx: Context<CreateLabubuMint>, labubu_id: u8) -> Result<()> {
         require!(labubu_id >= 1 && labubu_id <= 11, LabubuError::InvalidLabubuId);
 
@@ -50,14 +50,14 @@ pub mod vault {
                     from: ctx.accounts.authority.to_account_info(),
                     to: ctx.accounts.mint.to_account_info(),
                 },
-                &[&[b"labubu_mint", &[labubu_id], &[ctx.bumps.mint]]],
+                &[&[b"labubu_mint".as_ref(), &[labubu_id], &[ctx.bumps.mint]]],
             ),
             lamports,
             mint_size as u64,
             &ctx.accounts.token_program.key(),
         )?;
 
-        // Step 2: Initialize Token-2022 Mint
+        // Step 2: Initialize Token Mint
         let cpi_context = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             token_interface::InitializeMint2 {
